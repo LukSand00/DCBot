@@ -1,0 +1,7 @@
+# environment files
+.env
+.idea
+.venv
+
+# database
+data/database

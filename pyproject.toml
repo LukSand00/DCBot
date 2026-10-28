@@ -1,0 +1,10 @@
+[project]
+name = "pythonproject1"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "discord-py[voice]>=2.7.1",
+    "mutagen>=1.48.1",
+    "python-dotenv>=1.2.4",
+]
