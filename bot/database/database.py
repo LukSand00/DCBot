@@ -38,11 +38,10 @@ class Database:
             raise RuntimeError('Database is not connected.')
         adjusted_name = f"%{Database.escape_characters(song_name)}%"
         async with self.connection.execute("""
-                                           SELECT song_name, full_path, duration FROM song 
+                                           SELECT song_name, full_path, duration FROM songs
                                            WHERE song_name LIKE ? ESCAPE ? 
                                            ORDER BY song_name LIMIT 11""", (adjusted_name,Database.ESCAPE_CHARACTER,),) as cursor:
             rows = await cursor.fetchall()
-
         return rows
 
     @classmethod

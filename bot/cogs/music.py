@@ -1,7 +1,8 @@
+import os
 import asyncio
 from collections import deque
-from bot.database.database import Database
-from bot.views.views import SongListView
+from database.database import Database
+from views.views import SongListView
 
 import discord
 from discord.ext import commands
@@ -9,11 +10,12 @@ from discord.ext import commands
 class Music(commands.Cog):
 
     DISPLAY_LIMIT = 10
+    QUEUE_LIMIT = 10
+    MINIMAL_QUERY_LENGTH = 5
 
-    def __init__(self, bot, database: Database):
+    def __init__(self, bot):
         self.bot = bot
         self._last_member = None
-        self.database = database
         self.queue = []
 
     @commands.Cog.listener()
@@ -22,24 +24,30 @@ class Music(commands.Cog):
 
     @commands.command()
     async def play(self, ctx, *, query):
-        song_list = await self.database.search_songs(query)
-        if len(song_list) == 0:
-            await ctx.send('Song not found.')
+        song_list = await self.bot.database.search_songs(query)
+        song = await self.validate_list(ctx, song_list)
+        if not song:
             return
-        elif len(song_list) > self.DISPLAY_LIMIT:
-            await ctx.send('Found many results. Narrow down your query.')
-            return
-        elif 1 < len(song_list):
-            names_text = '\n'.join(n['song_name'] + '\n' for n in song_list)
-            await ctx.send('Multiple results. Pick from list below.\n' + names_text)
-            return
-        song = song_list[0]
         if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
             self.queue.append(song)
             await ctx.send('Song added to queue.')
         else:
             await self.play_song(ctx, song)
         return
+
+    async def validate_list(self, ctx, song_list):
+        if len(song_list) == 0:
+            await ctx.send('Song not found.')
+            return None
+        elif len(song_list) > self.DISPLAY_LIMIT:
+            await ctx.send('Found many results. Narrow down your query.')
+            return None
+        elif 1 < len(song_list):
+            names_text = '\n'.join(n['song_name'] + '\n' for n in song_list)
+            await ctx.send('Multiple results. Pick from list below.\n' + names_text)
+            return None
+        else:
+            return song_list[0]
 
     async def choose_song(self,ctx,song_list):
         view = SongListView(ctx.author)
@@ -61,17 +69,21 @@ class Music(commands.Cog):
                 await ctx.send('You are not connected to a voice channel.')
                 raise commands.CommandError('Author not connected to a voice channel.')
 
-        #elif ctx.voice_client.is_playing():
-        #    LOGIKA DODAWANIA PIOSENEK DO KOLEJKI
-        #    ctx.voice_client.stop()
-
     def track_finished(self, ctx, error):
         if error:
-            print(f'Player error: {error}')
+            print(f'Player error: {error}', flush=True)
+            return None
         if self.queue:
             song = self.queue.pop(0)
-            self.play_song(ctx,song)
+            fut = asyncio.run_coroutine_threadsafe(self.play_song(ctx=ctx,song=song), self.bot.loop)
+        else:
+            fut = asyncio.run_coroutine_threadsafe(self.finished_playing(ctx=ctx), self.bot.loop)
+        fut.result()
 
+
+    async def finished_playing(self, ctx):
+        await ctx.send('Finished playing.')
+        await ctx.voice_client.disconnect()
 
     @staticmethod
     def format_duration(duration):
@@ -80,3 +92,6 @@ class Music(commands.Cog):
         else:
             minutes, seconds = divmod(duration, 60)
             return f'Duration: {minutes}:{seconds}.'
+
+async def setup(bot):
+    await bot.add_cog(Music(bot))

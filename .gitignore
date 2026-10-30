@@ -1,7 +1,7 @@
 # environment files
-.env
+bot/.env
 .idea
 .venv
 
 # database
-data/database
+bot/data/database
