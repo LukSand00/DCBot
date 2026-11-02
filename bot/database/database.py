@@ -1,5 +1,6 @@
 import aiosqlite
 import os
+from models.song import Song
 
 class Database:
     # CONSTANT USED AS ESCAPE CHARACTER IN SQL QUERIES
@@ -42,7 +43,7 @@ class Database:
                                            WHERE song_name LIKE ? ESCAPE ? 
                                            ORDER BY song_name LIMIT 11""", (adjusted_name,Database.ESCAPE_CHARACTER,),) as cursor:
             rows = await cursor.fetchall()
-        return rows
+        return [Song(**row) for row in rows]
 
     @classmethod
     def escape_characters(cls,song_name: str):

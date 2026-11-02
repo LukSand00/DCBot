@@ -1,7 +1,5 @@
 import os
 import asyncio
-from collections import deque
-from database.database import Database
 from views.views import SongListView
 
 import discord
@@ -10,7 +8,7 @@ from discord.ext import commands
 class Music(commands.Cog):
 
     DISPLAY_LIMIT = 10
-    QUEUE_LIMIT = 10
+    QUEUE_LIMIT = int(os.environ.get("MUSIC_QUEUE_LIMIT"))
     MINIMAL_QUERY_LENGTH = 5
 
     def __init__(self, bot):
@@ -23,17 +21,70 @@ class Music(commands.Cog):
         member = member or ctx.author
 
     @commands.command()
+    @commands.has_role(os.environ.get('MUSIC_ROLE_ID'))
     async def play(self, ctx, *, query):
         song_list = await self.bot.database.search_songs(query)
         song = await self.validate_list(ctx, song_list)
         if not song:
             return
         if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
-            self.queue.append(song)
-            await ctx.send('Song added to queue.')
+            if len(self.queue) <= self.QUEUE_LIMIT:
+                self.queue.append(song)
+                await ctx.send('Song added to queue.')
+            else:
+                await ctx.send(f'Reached queue limit of {Music.QUEUE_LIMIT}.')
         else:
             await self.play_song(ctx, song)
         return
+
+    @commands.command()
+    @commands.has_role(os.environ.get('MUSIC_ROLE_ID'))
+    async def pause(self,ctx):
+        if ctx.voice_client.is_playing():
+            ctx.voice_client.pause()
+            await ctx.send('Paused.')
+        else:
+            await ctx.send('Bot is already paused.')
+
+    @commands.command()
+    @commands.has_role(os.environ.get('MUSIC_ROLE_ID'))
+    async def resume(self,ctx):
+        if ctx.voice_client.is_paused():
+            ctx.voice_client.resume()
+            await ctx.send('Resumed.')
+        else:
+            await ctx.send('Bot is already playing.')
+
+    @commands.command()
+    @commands.has_role(os.environ.get('MUSIC_ROLE_ID'))
+    async def skip(self, ctx):
+        if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
+            await ctx.send('Skipping.')
+            ctx.voice_client.stop()
+
+    @commands.command()
+    @commands.has_role(os.environ.get('MUSIC_ROLE_ID'))
+    async def leave(self, ctx):
+        if ctx.voice_client:
+            self.queue.clear()
+            ctx.voice_client.stop()
+
+    @play.before_invoke
+    async def ensure_voice_or_join(self, ctx):
+        if ctx.voice_client is None:
+            if ctx.author.voice:
+                await ctx.author.voice.channel.connect()
+            else:
+                await ctx.send('You are not connected to a voice channel.')
+                raise commands.CheckFailure('Author not connected to a voice channel.')
+
+    @pause.before_invoke
+    @resume.before_invoke
+    @skip.before_invoke
+    async def ensure_bot_connected(self, ctx):
+        if ctx.voice_client is None:
+            await ctx.send('Bot is not connected to a voice channel.')
+            raise commands.CheckFailure('Bot is not connected to a voice channel.')
 
     async def validate_list(self, ctx, song_list):
         if len(song_list) == 0:
@@ -43,31 +94,26 @@ class Music(commands.Cog):
             await ctx.send('Found many results. Narrow down your query.')
             return None
         elif 1 < len(song_list):
-            names_text = '\n'.join(n['song_name'] + '\n' for n in song_list)
-            await ctx.send('Multiple results. Pick from list below.\n' + names_text)
-            return None
+            song_list = await self.choose_song(ctx, song_list)
+            return song
         else:
+            song = song_list[0]
             return song_list[0]
 
     async def choose_song(self,ctx,song_list):
-        view = SongListView(ctx.author)
-        for song in song_list:
-            view.add_item(discord.ui.Button(label=song["song_name"], style=discord.ButtonStyle.primary))
-        view.message = await ctx.send("Multiple results. Pick from the list.", view=view)
+        lines = "Choose song from the list:\n"
+        view = SongListView(author=ctx.author, songs=song_list)
+        view.message = await ctx.send(lines, view=view)
+        await view.wait()
+        if view.choice is None:
+            return await ctx.send("Timed out.")
+        else:
+            return view.choice
 
     async def play_song(self,ctx, song):
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(song['full_path']))
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(song.full_path))
         ctx.voice_client.play(source, after=lambda error: self.track_finished(ctx, error))
-        await ctx.send(f'Now playing: {song["song_name"]}. ' + Music.format_duration(song['duration']))
-
-    @play.before_invoke
-    async def ensure_voice(self, ctx):
-        if ctx.voice_client is None:
-            if ctx.author.voice:
-                await ctx.author.voice.channel.connect()
-            else:
-                await ctx.send('You are not connected to a voice channel.')
-                raise commands.CommandError('Author not connected to a voice channel.')
+        await ctx.send(f'Now playing: {song.song_name}. ' + song.format_duration())
 
     def track_finished(self, ctx, error):
         if error:
@@ -79,19 +125,12 @@ class Music(commands.Cog):
         else:
             fut = asyncio.run_coroutine_threadsafe(self.finished_playing(ctx=ctx), self.bot.loop)
         fut.result()
-
+        return None
 
     async def finished_playing(self, ctx):
         await ctx.send('Finished playing.')
         await ctx.voice_client.disconnect()
 
-    @staticmethod
-    def format_duration(duration):
-        if duration is None:
-            return 'Unknown length.'
-        else:
-            minutes, seconds = divmod(duration, 60)
-            return f'Duration: {minutes}:{seconds}.'
 
 async def setup(bot):
     await bot.add_cog(Music(bot))
