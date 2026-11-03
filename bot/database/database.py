@@ -1,6 +1,7 @@
 import aiosqlite
 import os
 from models.song import Song
+from database.initialize_database import main as init_database
 
 class Database:
     # CONSTANT USED AS ESCAPE CHARACTER IN SQL QUERIES
@@ -17,7 +18,8 @@ class Database:
         if self.connection is not None:
             raise RuntimeError('Database already connected.')
         if not os.path.exists(self.db_path):
-            raise FileNotFoundError('Database does not exist. Run initialize_database.py script first.')
+            print('Database does not exist. Runnning initialize_database...')
+            init_database()
         connection = await aiosqlite.connect(self.db_path)
         try:
             connection.row_factory = aiosqlite.Row
