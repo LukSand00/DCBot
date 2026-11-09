@@ -2,6 +2,11 @@
 bot/.env
 .idea
 .venv
+.claude
+Dockerfile
 
 # database
-bot/data/database
+bot/data/*
+
+# test file
+bot/test_ytdlp.py

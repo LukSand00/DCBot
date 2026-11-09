@@ -5,12 +5,14 @@ from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 
-from database.database import Database
 
 load_dotenv()
+from database.database import Database
 
 INITIAL_COGS = [
-    "cogs.music",
+    "cogs.ytmusic",
+    "cogs.localmusic",
+    "cogs.admin",
 ]
 
 class Bot(commands.Bot):
