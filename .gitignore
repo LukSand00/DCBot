@@ -3,10 +3,13 @@ bot/.env
 .idea
 .venv
 .claude
-Dockerfile
 
 # database
 bot/data/*
 
 # test file
 bot/test_ytdlp.py
+
+# pycache
+__pycache__/
+*.py[cod]

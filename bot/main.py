@@ -10,8 +10,7 @@ load_dotenv()
 from database.database import Database
 
 INITIAL_COGS = [
-    "cogs.ytmusic",
-    "cogs.localmusic",
+    "cogs.music",
     "cogs.admin",
 ]
 

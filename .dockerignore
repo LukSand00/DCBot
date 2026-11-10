@@ -1,0 +1,12 @@
+# Utilities
+.gitignore
+Dockerfile
+README.md
+
+# Local environment
+./.claude
+./.venv
+./bot/data
+./bot/.env
+./bot/.env-example
+./bot/test_ytdlp.py

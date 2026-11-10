@@ -10,7 +10,7 @@ from services.musicservice import mpm
 import discord
 from discord.ext import commands
 
-
+#TODO: CLEAN UP/REFACTOR, MAYBE SPLIT INTO MULTIPLE COGS.
 class Music(commands.Cog):
 
     DISPLAY_LIMIT = 10
@@ -145,6 +145,7 @@ class Music(commands.Cog):
             raise commands.CheckFailure('There is no player connected to server.')
 
     async def _play_song(self,ctx, song) -> None:
+        #TODO: ADJUST TO BE ABLE TO REMOVE SONG WHEN IT FINISHES PLAYING.
         source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(song.full_path))
         ctx.voice_client.play(source, after=lambda error: self._track_finished(ctx, song, error))
         await ctx.send(f'Now playing: {song.song_name}. ' + song.format_duration())
@@ -163,6 +164,7 @@ class Music(commands.Cog):
             return view.choice
 
     def _track_finished(self, ctx, song, error):
+        #TODO: REFACTOR METHOD, ADD PROPER TMP FILE REMOVAL.
         if error:
             print(f'Player error: {error}', flush=True)
             return None
